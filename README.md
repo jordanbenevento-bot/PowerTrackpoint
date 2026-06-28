@@ -19,8 +19,10 @@ By bypassing the heavy WPF/.NET Framework UI container of the original Lenovo Qu
 
 ## Known Issues (Alpha Stage)
 
-*   **Administrator Windows (UIPI):** Clicking does not work when hovering over applications running with administrative privileges (e.g., Task Manager, Administrator PowerShell/CMD) due to Windows User Interface Privilege Isolation (UIPI) security restrictions.
-*   **Middle Button Scroll:** On some models, the middle scroll button of the Trackpoint might temporarily stop scrolling (under investigation). *Try restarting the ELAN UWP helper if this happens.*
+*   **Administrator Windows (UIPI):** Input injection is blocked on elevated admin windows due to Windows User Interface Privilege Isolation (UIPI) security restrictions.
+*   **Middle Button Scroll:** The middle scroll button of the Trackpoint stops working when using this customization (currently under investigation).
+*   **Trackpoint Settings Panel:** The Trackpoint options tab inside the Windows Mouse Properties dialog (Control Panel) stops working correctly.
+*   **Lenovo Driver Updates:** Standard Lenovo Vantage or driver updates might overwrite or revert this customization.
 *   **Helper Process Interruption:** The background helper (`tphandler_helper.exe`) may occasionally stop. You can manually restart it using a keyboard shortcut or the Task Scheduler.
 *   **Pre-Logon Session:** Tap-to-click is not active on the Windows lock screen/before logging in, as the helper runs inside the active user's session context.
 *   **Non-Admin Users:** Untested on standard (non-administrator) user accounts.
@@ -63,6 +65,7 @@ To respect copyrights and licenses:
 
 This project is in its **Alpha** stage. Contributions are very welcome! Areas we want to improve:
 *   Support for clicking inside high-integrity (Administrator) windows (bypassing UIPI).
+*   Restoring the middle scroll button and mouse settings panel integration.
 *   A configuration UI to adjust tap sensitivity and double-tap delay intervals.
 *   Support for Drag & Drop gestures using tap-and-hold logic.
 
@@ -84,7 +87,9 @@ This project is in its **Alpha** stage. Contributions are very welcome! Areas we
 ## Problemas Conocidos (Estado Alpha)
 
 *   **Ventanas de Administrador (UIPI):** El click no funciona si el cursor está sobre aplicaciones que se ejecutan como Administrador debido a las restricciones de seguridad de Windows (UIPI).
-*   **Botón del Medio (Scroll):** En algunos modelos, el botón central de scroll podría dejar de funcionar temporalmente (bajo investigación). *Intenta reiniciar el proceso de fondo de ELAN si esto ocurre.*
+*   **Botón del Medio (Scroll):** El botón central de scroll deja de funcionar tras aplicar la personalización (bajo investigación).
+*   **Panel de Configuración de Trackpoint:** La pestaña de opciones del Trackpoint en la "Configuración de Mouse" de Windows (Panel de Control) deja de responder correctamente.
+*   **Actualizaciones de Drivers de Lenovo:** Las actualizaciones automáticas de Lenovo Vantage o de Windows podrían sobrescribir y revertir esta personalización.
 *   **Interrupción del Helper:** El proceso de fondo `tphandler_helper.exe` podría detenerse ocasionalmente. Puede reiniciarse manualmente mediante un atajo o desde el programador de tareas.
 *   **Sesión de Pre-Inicio:** Tap-to-click no funciona en la pantalla de bloqueo de Windows, ya que el helper requiere iniciar sesión de usuario.
 *   **Usuarios No Administradores:** Sin probar en cuentas de usuario estándar.
