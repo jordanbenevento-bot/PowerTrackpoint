@@ -55,9 +55,6 @@ $msixPath = Join-Path $destHelperDir "PowerTrackpoint.msix"
 
 if (Test-Path $stagingDir) { Remove-Item -Recurse -Force $stagingDir }
 if (Test-Path $destHelperDir) {
-    # Stop helper if running
-    Stop-Process -Name tphandler_helper -Force -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName "StartTrackPointHelper" -Confirm:$false -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force $destHelperDir
 }
 New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
@@ -109,29 +106,7 @@ $null = Add-AppxProvisionedPackage -Online -PackagePath $msixPath -SkipLicense
 Write-Output "Registrando paquete para el usuario actual..."
 $null = Add-AppxPackage -Path $msixPath -ErrorAction SilentlyContinue
 
-# 10. Copy and Setup Helper Process
-Write-Output "Instalando helper de accesibilidad (UIAccess)..."
-$helperExePath = Join-Path $projectDir "bin\tphandler_helper.exe"
-if (!(Test-Path $helperExePath)) {
-    $helperExePath = Join-Path $scriptDir "tphandler_helper.exe"
-}
-Copy-Item -Path $helperExePath -Destination (Join-Path $destHelperDir "tphandler_helper.exe") -Force
-
-# Sign helper
-Write-Output "Firmando helper..."
-& $signtool sign /fd SHA256 /a /f $pfxPath /p 123456 (Join-Path $destHelperDir "tphandler_helper.exe") | Out-Null
-
-# Setup Task Scheduler
-Write-Output "Configurando tarea programada al inicio de sesión..."
-$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$action = New-ScheduledTaskAction -Execute (Join-Path $destHelperDir "tphandler_helper.exe")
-$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive
-$trigger = New-ScheduledTaskTrigger -AtLogon
-
-$null = Register-ScheduledTask -TaskName "StartTrackPointHelper" -Action $action -Principal $principal -Trigger $trigger -Force
-$null = Start-ScheduledTask -TaskName "StartTrackPointHelper"
-
-# 11. Cleanup Staging
+# 10. Cleanup Staging
 Remove-Item -Recurse -Force $stagingDir
 
 Write-Output "=== INSTALACION COMPLETADA CON EXITO ==="

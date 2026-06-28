@@ -1,11 +1,15 @@
 #include <windows.h>
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Open the Named Event created by the helper process in the current session
-    HANDLE hEvent = OpenEvent(EVENT_MODIFY_STATE, FALSE, "Local\\TrackPointClickEvent");
-    if (hEvent) {
-        SetEvent(hEvent);
-        CloseHandle(hEvent);
-    }
+    INPUT inputs[2];
+    ZeroMemory(inputs, sizeof(inputs));
+    
+    inputs[0].type = INPUT_MOUSE;
+    inputs[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+    
+    inputs[1].type = INPUT_MOUSE;
+    inputs[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+    
+    SendInput(2, inputs, sizeof(INPUT));
     return 0;
 }
