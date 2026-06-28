@@ -1,0 +1,23 @@
+# Ignore local certificates and MSIX output
+*.pfx
+*.cer
+*.msix
+*.o
+
+# Staging folders
+C:/PowerTrackpointStaging/
+staging/
+
+# IDE files
+.vscode/
+.idea/
+.vs/
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+
+# OS temporary files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
