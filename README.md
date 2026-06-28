@@ -23,7 +23,7 @@ By bypassing the heavy WPF/.NET Framework UI container of the original Lenovo Qu
 *   **Middle Button Scroll:** The middle scroll button of the Trackpoint stops working when using this customization (currently under investigation; the pointing device is Synaptics `SYNA802E` with `SynHsaService`).
 *   **Trackpoint Settings Panel:** The Trackpoint options tab inside the Windows Mouse Properties dialog (Control Panel) stops working correctly.
 *   **Lenovo Driver Updates:** Standard Lenovo Vantage or driver updates might overwrite or revert this customization.
-*   **Helper Process Interruption:** The background helper (`tphandler_helper.exe`) may occasionally stop. You can manually restart it using a keyboard shortcut or the Task Scheduler.
+*   **Helper Process Interruption:** If the helper (`tphandler_helper.exe`) stops, the Scheduled Task restarts it automatically (3 retries) and again at next logon. You can also re-trigger it with the Lenovo **Fn + G** hotkey — it toggles the Quick Menu and restarts the service if it stopped (note it also fires a click at the current pointer position). Meanwhile the client falls back to a normal (non-UIPI) click, so basic tap-to-click never breaks.
 *   **Pre-Logon Session:** Tap-to-click is not active on the Windows lock screen/before logging in, as the helper runs inside the active user's session context.
 *   **Non-Admin Users:** Untested on standard (non-administrator) user accounts.
 
@@ -65,6 +65,17 @@ To respect copyrights and licenses:
 
 ---
 
+## Uninstall
+
+Run `scripts/uninstall.ps1` as Administrator — it removes the helper, its Scheduled Task and the modified package, and restores the UAC Secure Desktop. Then reinstall **TrackPoint Quick Menu** from the Microsoft Store to get Lenovo's original menu back.
+
+## Troubleshooting
+
+*   **No click at all:** confirm the helper is running with `Get-Process tphandler_helper`; if not, `Start-ScheduledTask -TaskName "PowerTrackpoint Helper"`. The client falls back to a direct click when the helper is down, so a fully dead click usually means the protocol activation itself failed — re-run the installer.
+*   **Clicks work on normal windows but not Administrator ones:** the helper isn't getting uiAccess. Check that `tphandler_helper.exe` is signed and located under `C:\Program Files\` (a secure location) and that UAC (`EnableLUA`) is enabled.
+
+---
+
 ## Contributing
 
 This project is in its **Alpha** stage. Contributions are very welcome! Areas we want to improve:
@@ -94,7 +105,7 @@ This project is in its **Alpha** stage. Contributions are very welcome! Areas we
 *   **Botón del Medio (Scroll):** El botón central de scroll deja de funcionar tras aplicar la personalización (bajo investigación; el dispositivo es Synaptics `SYNA802E` con `SynHsaService`).
 *   **Panel de Configuración de Trackpoint:** La pestaña de opciones del Trackpoint en la "Configuración de Mouse" de Windows (Panel de Control) deja de responder correctamente.
 *   **Actualizaciones de Drivers de Lenovo:** Las actualizaciones automáticas de Lenovo Vantage o de Windows podrían sobrescribir y revertir esta personalización.
-*   **Interrupción del Helper:** El proceso de fondo `tphandler_helper.exe` podría detenerse ocasionalmente. Puede reiniciarse manualmente mediante un atajo o desde el programador de tareas.
+*   **Interrupción del Helper:** Si el helper (`tphandler_helper.exe`) se detiene, la Scheduled Task lo reinicia sola (3 reintentos) y de nuevo al próximo logon. También podés reactivarlo con el hotkey de Lenovo **Fn + G** — habilita/deshabilita el Quick Menu y reinicia el servicio si se cayó (ojo que además dispara un click donde esté el puntero). Mientras tanto el cliente cae a un click normal (sin UIPI), así que el tap-to-click básico nunca se rompe.
 *   **Sesión de Pre-Inicio:** Tap-to-click no funciona en la pantalla de bloqueo de Windows, ya que el helper requiere iniciar sesión de usuario.
 *   **Usuarios No Administradores:** Sin probar en cuentas de usuario estándar.
 
@@ -103,7 +114,7 @@ This project is in its **Alpha** stage. Contributions are very welcome! Areas we
 ## Compatibilidad
 
 Diseñado para **ThinkPads modernos** con drivers ELAN/Synaptics PointStick que soporten el acceso rápido de doble tap.
-*   **Dispositivo Probado:** ThinkPad X1 2-in-1 Aura Edition.
+*   **Dispositivo Probado:** ThinkPad X1 2-in-1 Aura Edition. El pointing stick aparece como Synaptics `HID\SYNA802E` (la app de *TrackPoint* incluida es de marca ELAN, pero el dispositivo HID reporta como Synaptics).
 *   **Requisitos:** Windows 10/11 y tener instalada la app original "TrackPoint Quick Menu" desde la Microsoft Store (se utiliza para clonar sus assets).
 
 ---
@@ -116,8 +127,24 @@ Diseñado para **ThinkPads modernos** con drivers ELAN/Synaptics PointStick que 
     ```powershell
     Set-ExecutionPolicy Bypass -Scope Process -Force
     .\scripts\install.ps1
+    # opcional: permite que el TrackPoint clickee el prompt de UAC (baja la seguridad de UAC)
+    # .\scripts\install.ps1 -AllowClickUAC
     ```
-4.  ¡Listo! Disfruta de un click instantáneo en tu TrackPoint.
+4.  El script ubica las herramientas del Windows SDK (las instala con `winget` si faltan), clona tus recursos locales del Quick Menu, inyecta y firma (Authenticode) nuestro cliente, arma y firma el MSIX, lo aprovisiona, e instala el helper uiAccess como Scheduled Task al logon.
+5.  ¡Haz doble tap en tu TrackPoint para probar!
+
+> **Compilar desde fuente (devs):** los `bin/*.exe` ya vienen compilados. Para recompilar el cliente + helper, corre `bash scripts/build.sh` (cross-compile con mingw-w64).
+
+---
+
+## Desinstalación
+
+Corre `scripts/uninstall.ps1` como Administrador — quita el helper, su Scheduled Task y el paquete modificado, y restaura el Secure Desktop de UAC. Después reinstala **TrackPoint Quick Menu** desde la Microsoft Store para recuperar el menú original de Lenovo.
+
+## Solución de Problemas
+
+*   **No hace click:** confirma que el helper corra con `Get-Process tphandler_helper`; si no, `Start-ScheduledTask -TaskName "PowerTrackpoint Helper"`. El cliente cae a un click directo cuando el helper está caído, así que un click totalmente muerto suele significar que falló la activación del protocolo — vuelve a correr el instalador.
+*   **Clickea en ventanas normales pero no en las de Administrador:** el helper no está obteniendo uiAccess. Verifica que `tphandler_helper.exe` esté firmado y ubicado en `C:\Program Files\` (secure location) y que UAC (`EnableLUA`) esté activo.
 
 ---
 
