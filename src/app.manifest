@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    uiAccess=true permite que SendInput salte UIPI e inyecte sobre ventanas de
+    integrity level alto (apps de Administrador). Requisitos para que Windows lo
+    honre: (1) el PE debe estar firmado Authenticode por un cert en Trusted Root
+    (lo hace install.ps1), y (2) el binario debe ejecutarse desde una "secure
+    location" (Program Files / System32). asInvoker = no pide elevacion UAC.
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="true" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

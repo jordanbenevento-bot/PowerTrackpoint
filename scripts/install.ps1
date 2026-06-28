@@ -1,3 +1,8 @@
+# -AllowClickUAC: saca el prompt de UAC del Secure Desktop (PromptOnSecureDesktop=0)
+# para que el TrackPoint pueda clickearlo. BAJA la seguridad de UAC (queda expuesto a
+# inyeccion de input). Opt-in: por defecto NO se toca el Secure Desktop.
+param([switch]$AllowClickUAC)
+
 $ErrorActionPreference = "Stop"
 
 # 1. Admin privilege check
@@ -8,6 +13,11 @@ if (!$isAdmin) {
 }
 
 Write-Output "=== PowerTrackpoint Installer (Alpha) ==="
+
+# 1.5 Detener cualquier helper previo y su tarea (libera el exe para reinstalar)
+Unregister-ScheduledTask -TaskName "PowerTrackpoint Helper" -Confirm:$false -ErrorAction SilentlyContinue
+Get-Process tphandler_helper -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
 
 # 2. Locate Windows SDK tools (makeappx / signtool)
 $sdkPath = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter "makeappx.exe" -Recurse -ErrorAction SilentlyContinue | 
@@ -72,8 +82,9 @@ if (!(Test-Path $clientExePath)) {
 }
 Copy-Item -Path $clientExePath -Destination (Join-Path $stagingDir "TrackPointQuickMenu\TrackPointQuickMenu.exe") -Force
 
-# Remove the original signature file
+# Remove the original signature file (will be re-signed) and any stale backup
 Remove-Item -Path (Join-Path $stagingDir "AppxSignature.p7x") -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $stagingDir "TrackPointQuickMenu\TrackPointQuickMenu.exe.bak") -ErrorAction SilentlyContinue
 
 # 6. Generate Certificate
 Write-Output "Generando certificado auto-firmado..."
@@ -86,6 +97,14 @@ $null = Export-Certificate -Cert $cert -FilePath $cerPath
 Write-Output "Instalando certificado en los almacenes locales de confianza..."
 $null = Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\LocalMachine\Root"
 $null = Import-Certificate -FilePath $cerPath -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
+
+# 7.5 Firmar el cliente con Authenticode ANTES de empaquetar.
+# uiAccess valida la firma del propio PE (no solo la del paquete MSIX), asi que el
+# exe embebido debe estar Authenticode-firmado por el cert de confianza. Sin esto,
+# Windows ignora uiAccess=true y el click sigue bloqueado por UIPI.
+Write-Output "Firmando el cliente (Authenticode, requisito de uiAccess)..."
+$clientInStaging = Join-Path $stagingDir "TrackPointQuickMenu\TrackPointQuickMenu.exe"
+& $signtool sign /fd SHA256 /f $pfxPath /p 123456 $clientInStaging | Out-Null
 
 # 8. Pack and Sign MSIX
 Write-Output "Empaquetando nuevo MSIX..."
@@ -106,8 +125,45 @@ $null = Add-AppxProvisionedPackage -Online -PackagePath $msixPath -SkipLicense
 Write-Output "Registrando paquete para el usuario actual..."
 $null = Add-AppxPackage -Path $msixPath -ErrorAction SilentlyContinue
 
+# 9.5 Instalar el helper uiAccess (hace el SendInput saltando UIPI sobre ventanas de admin).
+# Va suelto en Program Files (secure location), firmado Authenticode, y lo lanza una
+# Scheduled Task al logon. Lanzado asi (no por activacion MSIX), Windows si honra uiAccess.
+Write-Output "Instalando helper uiAccess..."
+$helperSrc = Join-Path $projectDir "bin\tphandler_helper.exe"
+if (!(Test-Path $helperSrc)) { $helperSrc = Join-Path $scriptDir "tphandler_helper.exe" } # fallback release
+$helperDst = Join-Path $destHelperDir "tphandler_helper.exe"
+Copy-Item -Path $helperSrc -Destination $helperDst -Force
+
+Write-Output "Firmando helper (Authenticode, requisito de uiAccess)..."
+& $signtool sign /fd SHA256 /f $pfxPath /p 123456 $helperDst | Out-Null
+
+Write-Output "Registrando tarea de inicio del helper (al logon, sin elevacion)..."
+$taskName = "PowerTrackpoint Helper"
+# Un exe uiAccess NO se puede lanzar por CreateProcess directo: Task Scheduler
+# devuelve ERROR_ELEVATION_REQUIRED (0x800702E4). Hay que pasar por ShellExecute
+# (Start-Process -> AppInfo), que otorga el token UIAccess a apps firmadas en
+# secure location sin prompt UAC. Por eso la accion lanza powershell -> Start-Process.
+$launchArg = "-NoProfile -WindowStyle Hidden -Command Start-Process -FilePath '$helperDst'"
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $launchArg
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+# uiAccess exige integrity level medium -> RunLevel Limited (NUNCA Highest).
+$principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+$null = Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force
+
+Write-Output "Iniciando helper..."
+Start-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+
+# 9.7 (opt-in) Sacar el prompt de UAC del Secure Desktop para poder clickearlo.
+# El prompt UAC corre en el Secure Desktop, inalcanzable por SendInput (ni con uiAccess).
+# Esto lo mueve al escritorio normal a costa de seguridad. Solo con -AllowClickUAC.
+if ($AllowClickUAC) {
+    Write-Output "ADVERTENCIA: deshabilitando Secure Desktop de UAC (PromptOnSecureDesktop=0) — baja la seguridad de UAC."
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name PromptOnSecureDesktop -Value 0
+}
+
 # 10. Cleanup Staging
 Remove-Item -Recurse -Force $stagingDir
 
 Write-Output "=== INSTALACION COMPLETADA CON EXITO ==="
-Write-Output "PowerTrackpoint está listo. Haz doble tap en tu TrackPoint para probarlo."
+Write-Output "PowerTrackpoint está listo (cliente + helper uiAccess). Haz doble tap en tu TrackPoint para probarlo."

@@ -1,0 +1,4 @@
+/* Embebe app.manifest como RT_MANIFEST (24) con el ID de exe (1 =
+   CREATEPROCESS_MANIFEST_RESOURCE_ID). windres resuelve "app.manifest"
+   via los include dirs (-I src). */
+1 24 "app.manifest"
