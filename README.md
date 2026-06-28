@@ -119,6 +119,15 @@ Diseñado para **ThinkPads modernos** con drivers ELAN/Synaptics PointStick que 
 
 ---
 
+## Legalidad y Empaquetado Clean Room
+
+Para respetar los derechos de autor y las licencias:
+*   **No se distribuye ningún binario ni recurso propietario** en este repositorio.
+*   El script de instalación (`install.ps1`) clona dinámicamente los recursos con licencia (imágenes, traducciones, metadata del manifiesto) que ya están presentes en la carpeta `WindowsApps` de tu propio sistema.
+*   Luego inserta nuestro inyector de clicks nativo y de código abierto, lo empaqueta en un nuevo contenedor `.msix`, lo firma localmente con un certificado auto-firmado de confianza para tu equipo, y lo aprovisiona a nivel de máquina.
+
+---
+
 ## Instalación
 
 1.  Clona el repositorio o descarga los archivos de la versión.
