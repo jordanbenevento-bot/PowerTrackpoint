@@ -17,6 +17,16 @@ By bypassing the heavy WPF/.NET Framework UI container of the original Lenovo Qu
 
 ---
 
+## Known Issues (Alpha Stage)
+
+*   **Administrator Windows (UIPI):** Clicking does not work when hovering over applications running with administrative privileges (e.g., Task Manager, Administrator PowerShell/CMD) due to Windows User Interface Privilege Isolation (UIPI) security restrictions.
+*   **Middle Button Scroll:** On some models, the middle scroll button of the Trackpoint might temporarily stop scrolling (under investigation). *Try restarting the ELAN UWP helper if this happens.*
+*   **Helper Process Interruption:** The background helper (`tphandler_helper.exe`) may occasionally stop. You can manually restart it using a keyboard shortcut or the Task Scheduler.
+*   **Pre-Logon Session:** Tap-to-click is not active on the Windows lock screen/before logging in, as the helper runs inside the active user's session context.
+*   **Non-Admin Users:** Untested on standard (non-administrator) user accounts.
+
+---
+
 ## Compatibility
 
 This utility is designed for **modern Lenovo ThinkPads** equipped with ELAN or Synaptics PointStick pointing device drivers that support the double-tap Quick Menu shortcut.
@@ -68,6 +78,16 @@ This project is in its **Alpha** stage. Contributions are very welcome! Areas we
 2. **Activación de Protocolo:** El servicio de Lenovo invoca el protocolo UWP `lenovo-trackpointmenu://`.
 3. **Interceptor PowerTrackpoint:** Reemplazamos este launcher con un cliente nativo en C ultra-rápido (`TrackPointQuickMenu.exe`) que emite una señal (`Local\TrackPointClickEvent`) y se cierra en menos de un milisegundo.
 4. **Helper en Background:** Un pequeño proceso en segundo plano (`tphandler_helper.exe`) escucha la señal e inyecta un click izquierdo del mouse físico usando la API de Windows `SendInput`.
+
+---
+
+## Problemas Conocidos (Estado Alpha)
+
+*   **Ventanas de Administrador (UIPI):** El click no funciona si el cursor está sobre aplicaciones que se ejecutan como Administrador debido a las restricciones de seguridad de Windows (UIPI).
+*   **Botón del Medio (Scroll):** En algunos modelos, el botón central de scroll podría dejar de funcionar temporalmente (bajo investigación). *Intenta reiniciar el proceso de fondo de ELAN si esto ocurre.*
+*   **Interrupción del Helper:** El proceso de fondo `tphandler_helper.exe` podría detenerse ocasionalmente. Puede reiniciarse manualmente mediante un atajo o desde el programador de tareas.
+*   **Sesión de Pre-Inicio:** Tap-to-click no funciona en la pantalla de bloqueo de Windows, ya que el helper requiere iniciar sesión de usuario.
+*   **Usuarios No Administradores:** Sin probar en cuentas de usuario estándar.
 
 ---
 
