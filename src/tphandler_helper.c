@@ -3,13 +3,13 @@
 /*
  * Helper residente de PowerTrackpoint.
  *
- * Lo lanza una Scheduled Task "al logon" (sesion interactiva, sin elevacion).
- * Su exe lleva el manifest uiAccess=true (resource.rc) y va firmado Authenticode
- * en C:\Program Files\PowerTrackpoint\ (secure location). Lanzado asi (NO por
- * activacion de protocolo MSIX), Windows SI honra uiAccess -> su SendInput salta
- * UIPI e inyecta el click sobre ventanas de Administrador (integrity level alto).
+ * Lo lanza una Scheduled Task al logon con RunLevel Highest (ADMINISTRADOR). Al
+ * correr elevado, su SendInput salta UIPI e inyecta el click sobre ventanas de
+ * apps de Administrador (integrity level alto). El manifest uiAccess del exe
+ * (resource.rc) es un resabio inofensivo: con privilegios de admin el bypass de
+ * UIPI no lo necesita.
  *
- * Espera el Named Event que senaliza el cliente liviano y hace el click.
+ * Duerme esperando el Named Event que senaliza el cliente Win32 y hace el click.
  */
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     /* Singleton: si ya hay un helper, salir. El cliente usa este mutex para
@@ -25,6 +25,13 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     if (ev == NULL) {
         return 1;
     }
+
+    /* Latencia minima: el helper duerme casi todo el tiempo (WaitForSingleObject)
+       y solo despierta un instante para el click, asi que subir la prioridad es
+       seguro (no acapara CPU) y recorta el retraso de wakeup tras el SetEvent del
+       cliente -> el hop de IPC se siente casi como un click directo. */
+    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
     INPUT inputs[2];
     ZeroMemory(inputs, sizeof(inputs));

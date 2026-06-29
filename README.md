@@ -8,19 +8,19 @@
 
 ## How It Works
 
-1. **Hardware Event:** A physical tap or double-tap on the TrackPoint is captured by the embedded controller (EC) and routed to Lenovo's hotkey service (`shtctky.exe`).
-2. **Protocol Trigger:** The Lenovo service checks if the quick menu package is installed and triggers the custom UWP protocol `lenovo-trackpointmenu://`.
-3. **PowerTrackpoint Interceptor:** PowerTrackpoint overrides this protocol handler with a lightweight native C client (`TrackPointQuickMenu.exe`). It signals a session-local Named Event (`Local\TrackPointClickEvent`) for the helper to act on and exits in under a millisecond. If the helper isn't running, it falls back to injecting the click itself.
-4. **uiAccess Clicker Helper:** A tiny background process (`tphandler_helper.exe`) — installed signed in `Program Files` and launched at logon by a Scheduled Task with the `uiAccess=true` privilege — listens for the Named Event and injects a Left Mouse Click via `SendInput`. uiAccess lets the click **bypass UIPI and reach windows of elevated (Administrator) apps**. The client itself must NOT carry uiAccess: MSIX protocol activation refuses to launch a uiAccess exe (error `0x300D`), so the privileged work lives in the Task-Scheduler-launched helper (which *can* get uiAccess).
+1. **Hardware Event:** A tap or double-tap on the TrackPoint is captured by the embedded controller and routed to Lenovo's hotkey service (`shtctky.exe`), which fires the `lenovo-trackpointmenu://` protocol.
+2. **Mock MSIX:** PowerTrackpoint clones Lenovo's Quick Menu package and **strips the protocol extension from its manifest**, then reinstalls it signed. `shtctky` still sees the package installed (so it keeps firing the double-tap), but Windows no longer claims the protocol as a UWP app — which removes the ~100 ms UWP activation lag.
+3. **Win32 Protocol Handler:** `lenovo-trackpointmenu` is registered in the registry (`HKLM\SOFTWARE\Classes\…`) pointing to a tiny native C client in `Program Files`. Windows launches it **instantly** (no UWP container); the client signals a Named Event (`Local\TrackPointClickEvent`).
+4. **Elevated Helper:** A small background process (`tphandler_helper.exe`) runs as **Administrator** (Scheduled Task, `RunLevel Highest`), sleeping on the Named Event. When signaled it injects a Left Mouse Click via `SendInput` with admin privileges — **bypassing UIPI to click elevated (Administrator) app windows**. (Earlier designs tried a `uiAccess` helper, but MSIX protocol activation rejects a `uiAccess` exe with error `0x300D`; running the helper elevated is simpler and the latency fix came from the Win32 handler, not the helper.)
 
-By bypassing the heavy WPF/.NET Framework UI container of the original Lenovo Quick Menu, the tap-to-click response is **instantaneous** (practically zero latency).
+The result is a tap-to-click that is **instantaneous** and works over Administrator app windows.
 
 ---
 
 ## Known Issues (Alpha Stage)
 
-*   **UAC Consent Prompt:** Clicking now works on elevated **app** windows (the uiAccess helper bypasses UIPI). The remaining exception is the UAC consent prompt itself, which runs on the isolated **Secure Desktop** — unreachable by `SendInput` by design. Run the installer with `-AllowClickUAC` to move UAC off the Secure Desktop if you want the TrackPoint to click it (this lowers UAC security).
-*   **Middle Button Scroll:** The middle scroll button of the Trackpoint stops working when using this customization (currently under investigation; the pointing device is Synaptics `SYNA802E` with `SynHsaService`).
+*   **UAC Consent Prompt:** Clicking works on elevated **app** windows (the elevated helper bypasses UIPI). The remaining exception is the UAC consent prompt itself, which runs on the isolated **Secure Desktop** — unreachable by `SendInput` by design. Run the installer with `-AllowClickUAC` to move UAC off the Secure Desktop if you want the TrackPoint to click it (this lowers UAC security).
+*   **Middle Button Scroll:** The middle scroll button of the Trackpoint stops working when using this customization (currently under investigation; the pointing device is Synaptics `SYNA802E` on generic Windows drivers — the press-to-scroll behavior is added by Lenovo software, not the driver).
 *   **Trackpoint Settings Panel:** The Trackpoint options tab inside the Windows Mouse Properties dialog (Control Panel) stops working correctly.
 *   **Lenovo Driver Updates:** Standard Lenovo Vantage or driver updates might overwrite or revert this customization.
 *   **Helper Process Interruption:** If the helper (`tphandler_helper.exe`) stops, the Scheduled Task restarts it automatically (3 retries) and again at next logon. You can also re-trigger it with the Lenovo **Fn + G** hotkey — it toggles the Quick Menu and restarts the service if it stopped (note it also fires a click at the current pointer position). Meanwhile the client falls back to a normal (non-UIPI) click, so basic tap-to-click never breaks.
@@ -43,7 +43,7 @@ This utility is designed for **modern Lenovo ThinkPads** equipped with ELAN or S
 To respect copyrights and licenses:
 *   **No proprietary binaries or assets are distributed** in this repository.
 *   The installation script (`install.ps1`) dynamically clones the licensed resources (images, translations, configuration manifest metadata) already present in your local system's `WindowsApps` folder.
-*   It then inserts our open-source native click injector, packages it into a new `.msix` container, signs it locally with a self-signed certificate trusted by your computer, and provisions it machine-wide.
+*   It repackages that clone into a new `.msix` — **with the UWP protocol extension stripped out** — signs it locally with a self-signed certificate trusted by your computer, and provisions it machine-wide. Our own open-source Win32 client and helper install separately into `Program Files` (they are the only binaries this repo ships).
 
 ---
 
@@ -79,7 +79,7 @@ Run `scripts/uninstall.ps1` as Administrator — it removes the helper, its Sche
 ## Contributing
 
 This project is in its **Alpha** stage. Contributions are very welcome! Areas we want to improve:
-*   ✅ ~~Support for clicking inside high-integrity (Administrator) windows (bypassing UIPI).~~ — done via the uiAccess helper.
+*   ✅ ~~Support for clicking inside high-integrity (Administrator) windows (bypassing UIPI).~~ — done via the elevated helper + Win32 protocol handler.
 *   Restoring the middle scroll button and mouse settings panel integration.
 *   A configuration UI to adjust tap sensitivity and double-tap delay intervals.
 *   Support for Drag & Drop gestures using tap-and-hold logic.
@@ -92,17 +92,19 @@ This project is in its **Alpha** stage. Contributions are very welcome! Areas we
 
 ## Cómo Funciona
 
-1. **Evento físico:** El doble toque físico en el TrackPoint es capturado por el firmware y enviado al sistema de hotkeys de Lenovo (`shtctky.exe`).
-2. **Activación de Protocolo:** El servicio de Lenovo invoca el protocolo UWP `lenovo-trackpointmenu://`.
-3. **Interceptor PowerTrackpoint:** Reemplazamos este launcher con un cliente nativo en C ultra-rápido (`TrackPointQuickMenu.exe`) que emite una señal (`Local\TrackPointClickEvent`) para que el helper actúe, y se cierra en menos de un milisegundo. Si el helper no está corriendo, hace el click él mismo como fallback.
-4. **Helper con uiAccess:** Un pequeño proceso en segundo plano (`tphandler_helper.exe`) — instalado firmado en `Program Files` y lanzado al logon por una Scheduled Task con el privilegio `uiAccess=true` — escucha la señal e inyecta el click con `SendInput`. uiAccess permite **saltar UIPI y clickear sobre ventanas de apps de Administrador**. El cliente NO puede llevar uiAccess: la activación de protocolo MSIX se niega a lanzar un exe con uiAccess (error `0x300D`), por eso el trabajo privilegiado vive en el helper lanzado por Task Scheduler (que sí puede obtener uiAccess).
+1. **Evento físico:** El doble-tap en el TrackPoint lo captura el firmware y lo enruta al servicio de hotkeys de Lenovo (`shtctky.exe`), que dispara el protocolo `lenovo-trackpointmenu://`.
+2. **MSIX mock:** PowerTrackpoint clona el paquete del Quick Menu de Lenovo y le **quita la extensión de protocolo del manifest**, y lo reinstala firmado. `shtctky` sigue viendo el paquete instalado (así sigue disparando el doble-tap), pero Windows ya no reclama el protocolo como app UWP — eso elimina el lag de ~100 ms de la activación UWP.
+3. **Handler Win32 del protocolo:** `lenovo-trackpointmenu` queda registrado en el registro (`HKLM\SOFTWARE\Classes\…`) apuntando a un cliente nativo en C en `Program Files`. Windows lo lanza **al instante** (sin contenedor UWP); el cliente señaliza un Named Event (`Local\TrackPointClickEvent`).
+4. **Helper elevado:** Un proceso de fondo (`tphandler_helper.exe`) corre como **Administrador** (Scheduled Task, `RunLevel Highest`), durmiendo sobre el Named Event. Al recibir la señal inyecta un click izquierdo con `SendInput` y privilegios de admin — **saltando UIPI para clickear ventanas de apps de Administrador**. (Diseños previos probaron un helper `uiAccess`, pero la activación de protocolo MSIX rechaza un exe `uiAccess` con error `0x300D`; correr el helper elevado es más simple, y el fix de latencia vino del handler Win32, no del helper.)
+
+El resultado: un tap-to-click **instantáneo** que funciona sobre ventanas de apps de Administrador.
 
 ---
 
 ## Problemas Conocidos (Estado Alpha)
 
-*   **Prompt de UAC:** El click ya funciona sobre ventanas de **apps** de Administrador (el helper uiAccess salta UIPI). La excepción que queda es el propio prompt de UAC, que corre en el **Secure Desktop** aislado — inalcanzable por `SendInput` por diseño. Corré el instalador con `-AllowClickUAC` para sacar UAC del Secure Desktop si querés que el TrackPoint lo clickee (baja la seguridad de UAC).
-*   **Botón del Medio (Scroll):** El botón central de scroll deja de funcionar tras aplicar la personalización (bajo investigación; el dispositivo es Synaptics `SYNA802E` con `SynHsaService`).
+*   **Prompt de UAC:** El click ya funciona sobre ventanas de **apps** de Administrador (el helper elevado salta UIPI). La excepción que queda es el propio prompt de UAC, que corre en el **Secure Desktop** aislado — inalcanzable por `SendInput` por diseño. Corré el instalador con `-AllowClickUAC` para sacar UAC del Secure Desktop si querés que el TrackPoint lo clickee (baja la seguridad de UAC).
+*   **Botón del Medio (Scroll):** El botón central de scroll deja de funcionar tras aplicar la personalización (bajo investigación; el dispositivo es Synaptics `SYNA802E` con drivers genéricos de Windows — el press-to-scroll lo agrega el software de Lenovo, no el driver).
 *   **Panel de Configuración de Trackpoint:** La pestaña de opciones del Trackpoint en la "Configuración de Mouse" de Windows (Panel de Control) deja de responder correctamente.
 *   **Actualizaciones de Drivers de Lenovo:** Las actualizaciones automáticas de Lenovo Vantage o de Windows podrían sobrescribir y revertir esta personalización.
 *   **Interrupción del Helper:** Si el helper (`tphandler_helper.exe`) se detiene, la Scheduled Task lo reinicia sola (3 reintentos) y de nuevo al próximo logon. También podés reactivarlo con el hotkey de Lenovo **Fn + G** — habilita/deshabilita el Quick Menu y reinicia el servicio si se cayó (ojo que además dispara un click donde esté el puntero). Mientras tanto el cliente cae a un click normal (sin UIPI), así que el tap-to-click básico nunca se rompe.
@@ -124,7 +126,7 @@ Diseñado para **ThinkPads modernos** con drivers ELAN/Synaptics PointStick que 
 Para respetar los derechos de autor y las licencias:
 *   **No se distribuye ningún binario ni recurso propietario** en este repositorio.
 *   El script de instalación (`install.ps1`) clona dinámicamente los recursos con licencia (imágenes, traducciones, metadata del manifiesto) que ya están presentes en la carpeta `WindowsApps` de tu propio sistema.
-*   Luego inserta nuestro inyector de clicks nativo y de código abierto, lo empaqueta en un nuevo contenedor `.msix`, lo firma localmente con un certificado auto-firmado de confianza para tu equipo, y lo aprovisiona a nivel de máquina.
+*   Reempaqueta ese clon en un nuevo `.msix` — **quitándole la extensión de protocolo UWP** —, lo firma localmente con un certificado auto-firmado de confianza para tu equipo, y lo aprovisiona a nivel de máquina. Nuestro cliente y helper Win32 de código abierto se instalan aparte en `Program Files` (son los únicos binarios que este repo distribuye).
 
 ---
 
