@@ -1,26 +1,17 @@
+<#
+	The variables $Global:RegValue and $RegPath need to be modifed to retrieve information from the
+	registry. You also need to change the default values for the ini file located under the Test-Path
+	for the Configuration file.
+
+	Implimentation of the save button to modify the registry needs to be added, as well as the nightmode
+	boolean. Applying registry information to the configuration file also needs to be added.
+
+	This is a basic demonstration of the window and some functionality. The registry value types are
+	unkown to me, I'm not certain as to how to classify them in this script.
+#>
+
 # This imports .NET libraries built into Windows.
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-
-$Global:ConfigFilePath = Join-Path $PSScriptRoot "config.ini"
-$XamlPath = Join-Path $PSScriptRoot "MainWindow.xaml"
-
-if (-not (Test-Path $XamlPath)) {
-    [System.Windows.MessageBox]::Show("ERROR: MainWindow.xaml could not be found.", "PowerTrackPoint")
-    Exit
-}
-
-if (-not (Test-Path $Global:config)) {
-    # TODO: Add information from registry to ini file 
-    # New-item -Path $Global:config -ItemType File -Force
-    @"
-[RegistryConfig]
-Tapforce=0
-DoubletapSpeed=0
-TapSpeed=0
-[WindowConfig]
-NightMode=0a
-"@ > $Global:ConfigFilePath
-}
 
 
 <#
@@ -56,11 +47,64 @@ function Get-IniContent ($filePath) {
 	return $ini
 }
 
+
+$Global:RegValue = @{
+	"TapForce" = 0
+	"DoubletapSpeed" = 0
+	"TapSpeed" = 0
+}
+
+
+# This function grabs information from the Window's Registry.
+# The registry Key, value pairs are stored in $Global:RegValue
+function Get-RegistryValues {
+	[CmdletBinding()]
+	param()
+
+	$RegPath = "HKLM:\System\CurrentControlSet\Control\Class\{4d36e96f-e325-11ce-bfc1-08002be10318}\0000\PointStick"
+
+	if (!(Test-Path $RegPath)) {
+		[System.Windows.MessageBox]::Show("ERROR: $($RegPath) could not be found.", "PowerTrackPoint")
+    	return
+	}
+
+	foreach ($Key in $Global:RegValue.Keys.Clone()) {
+        $Value = Get-ItemPropertyValue -Path $RegPath -Name $Key -ErrorAction SilentlyContinue
+
+        if ($null -ne $Value) {
+            $Global:RegValue.$Key = $Value
+        }
+	}
+}
+
+
+Get-RegistryValues
+
+$Global:ConfigFilePath = Join-Path $PSScriptRoot "config.ini"
+$XamlPath = Join-Path $PSScriptRoot "MainWindow.xaml"
+
+if (-not (Test-Path $XamlPath)) {
+    [System.Windows.MessageBox]::Show("ERROR: MainWindow.xaml could not be found.", "PowerTrackPoint")
+    Exit
+}
+
 $XamlText = Get-Content -Raw -Path $XamlPath
 
-# $XamlText = $XamlText -replace '\{TapForce\}', '15'
-# $XamlText = $XamlText -replace '\{DoubletapSpeed\}', '250'
-# $XamlText = $XamlText -replace '\{TapSpeed\}', '10'
+if (-not (Test-Path $Global:ConfigFilePath)) {
+	# TODO: Add nightmode boolean and add to MainWindow.xaml.
+    @"
+[RegistryConfig]
+TapForce=$( $Global:RegValue.TapForce )
+DoubletapSpeed=$( $Global:RegValue.DoubletapSpeed )
+TapSpeed=$( $Global:RegValue.TapSpeed )
+[WindowConfig]
+NightMode=0
+"@ > $Global:ConfigFilePath
+}
+
+foreach ($Key in $Global:RegValue.Keys) {
+	$XamlText = $XamlText -replace [Regex]::Escape("{$Key}"), $Global:RegValue.$Key
+}
 
 $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$XamlText)
 $window = [System.Windows.Markup.XamlReader]::Load($reader)
@@ -81,7 +125,6 @@ function Add-ButtonFunctions {
         [System.Windows.MessageBox]::Show("Checked!", "PowerTrackPoint")
     })
 }
-
 
 
 # $TapForce  = $window.FindName("TapForce")
