@@ -1,0 +1,131 @@
+<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PowerTrackPoint Settings"
+        Height="450"
+        Width="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="#FFF5F5F5"
+        FontFamily="Segoe UI"
+        FontSize="15">
+    <Canvas x:Name="canvasRoot" Background="White">
+
+    <Grid Margin="30">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock
+            Text="PowerTrackPoint Settings"
+            FontSize="30"
+            FontWeight="SemiBold"
+            Margin="0,0,0,10"/>
+
+        <!-- Main Settings -->
+        <Border Grid.Row="2"
+                Background="White"
+                CornerRadius="12"
+                Padding="25">
+
+            <Grid>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="25"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="25"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Tap Force -->
+                <TextBlock
+                    Grid.Row="0"
+                    VerticalAlignment="Center"
+                    Text="Tap Force"/>
+
+                <TextBox
+                    Name="TapForce"
+                    Grid.Row="0"
+                    Grid.Column="1"
+                    Height="42"
+                    FontSize="16"
+                    Padding="12,6"
+                    Text="{}{TapForce}"/>
+
+                <!-- Double Tap Speed -->
+                <TextBlock
+                    Grid.Row="2"
+                    VerticalAlignment="Center"
+                    Text="Double Tap Speed"/>
+
+                <TextBox
+                    Name="DoubletapSpeed"
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    Height="42"
+                    FontSize="16"
+                    Padding="12,6"
+                    Text="{}{DoubletapSpeed}"/>
+
+                <!-- Tap Speed -->
+                <TextBlock
+                    Grid.Row="4"
+                    VerticalAlignment="Center"
+                    Text="Tap Speed"/>
+
+                <TextBox
+                    Name="TapSpeed"
+                    Grid.Row="4"
+                    Grid.Column="1"
+                    Height="42"
+                    FontSize="16"
+                    Padding="12,6"
+                    Text="{}{TapSpeed}"/>
+
+            </Grid>
+        </Border>
+
+        <!-- Bottom Controls -->
+        <Grid Grid.Row="3" Margin="0,25,0,0">
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <CheckBox
+                Name="ChkNightMode"
+                VerticalAlignment="Center"
+                FontSize="16"
+                Content="Night Mode"/>
+
+            <Button
+                Name="BtnSave"
+                Grid.Column="1"
+                Width="130"
+                Height="44"
+                Content="Save"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Background="#0A64F6"
+                Foreground="White"
+                BorderThickness="0"
+                Cursor="Hand"/>
+
+        </Grid>
+
+    </Grid>
+
+</Canvas>
+</Window>
